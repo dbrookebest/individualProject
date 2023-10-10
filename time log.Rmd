@@ -1,0 +1,143 @@
+---
+title: "Time log"
+output: html_notebook
+---
+
+```{r}
+
+library(shiny)
+library(ggplot2)
+
+# Initialize an empty time log data frame
+time_log <- data.frame(
+  Date = character(0),
+  StartTime = character(0),
+  EndTime = character(0),
+  Actions = character(0)
+)
+
+# Function to add a time entry
+add_time_entry <- function(log, date, start_time, end_time, actions) {
+  entry <- data.frame(
+    Date = date,
+    StartTime = start_time,
+    EndTime = end_time,
+    Actions = actions
+  )
+  log <- rbind(log, entry)
+  return(log)
+}
+
+# Add the necessary time entries
+time_log <- add_time_entry(time_log, "9/3", "9:00pm", "10:13pm", "Found data and answered questions related to data")
+time_log <- add_time_entry(time_log, "9/10", "12:00pm", "12:45pm", "Created outline for project")
+time_log <- add_time_entry(time_log, "9/17", "12:30pm", "12:50pm", "Determined potential visualizations, created time log, brainstormed desired outcomes")
+time_log <- add_time_entry(time_log, "9/26", "9:30am", "9:40am", "Added time log and outline to GitHub")
+time_log <- add_time_entry(time_log, "9/30", "10:00am", "11:15am", "Based on previous outline, added specific details needed in order to start making visualizations")
+time_log <- add_time_entry(time_log, "10/2", "4:00pm", "6:00pm", "Implementing first three visualizations")
+time_log <- add_time_entry(time_log, "10/4", "4:00pm", "5:00pm", "Continue to work on visualizations according to outline")
+time_log <- add_time_entry(time_log, "10/5", "7:00pm", "10:00pm", "Completed visualizations (including time log)")
+time_log <- add_time_entry(time_log, "10/7", "11:15am", "12:30pm", "Work on video prompt and recording")
+time_log <- add_time_entry(time_log, "10/8", "6:45pm", "7:30pm", "Read through code for minor improvements and style")
+time_log <- add_time_entry(time_log, "10/9", "6:00pm", "7:00pm", "Create presentation and notes")
+
+
+# Create a Shiny app
+ui <- fluidPage(
+  titlePanel("Time Log Visualization"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      textInput("date", "Date (MM/DD):", ""),
+      textInput("start_time", "Start Time (HH:MMam/pm):", ""),
+      textInput("end_time", "End Time (HH:MMam/pm):", ""),
+      textInput("activity", "Activity:", ""),
+      actionButton("add_entry", "Add Time Entry")
+    ),
+    
+    mainPanel(
+      plotOutput("bar_chart"),
+      plotlyOutput("pie_chart")
+    )
+  )
+)
+
+server <- function(input, output, session) {
+  # Reactive values to store the time log
+  time_log_reactive <- reactiveVal(time_log)
+  
+  # Add a time entry when the "Add Time Entry" button is clicked
+  observeEvent(input$add_entry, {
+    date <- input$date
+    start_time <- input$start_time
+    end_time <- input$end_time
+    activity <- input$activity
+    
+    if (nchar(date) > 0 && nchar(start_time) > 0 && nchar(end_time) > 0 && nchar(activity) > 0) {
+      time_log_reactive(add_time_entry(time_log_reactive(), date, start_time, end_time, activity))
+    }
+    
+    # Clear input fields
+    updateTextInput(session, "date", value = "")
+    updateTextInput(session, "start_time", value = "")
+    updateTextInput(session, "end_time", value = "")
+    updateTextInput(session, "activity", value = "")
+  })
+  
+  # Calculate total time per date
+  daily_totals <- reactive({
+    time_log <- time_log_reactive()
+    time_log$StartTime <- as.POSIXct(time_log$StartTime, format = "%I:%M%p")
+    time_log$EndTime <- as.POSIXct(time_log$EndTime, format = "%I:%M%p")
+    time_log$Duration <- difftime(time_log$EndTime, time_log$StartTime, units = "mins")
+    
+    aggregate(Duration ~ Date, data = time_log, sum)
+  })
+  
+  # Create a bar chart of daily time totals
+  output$bar_chart <- renderPlot({
+    ggplot(data = daily_totals(), aes(x = Date, y = Duration)) +
+      geom_bar(stat = "identity", fill = "skyblue") +
+      labs(title = "Daily Time Log",
+           x = "Date",
+           y = "Total Minutes") +
+      theme_minimal()
+  })
+  
+  # Create a reactive pie chart of activities for a selected date
+  output$pie_chart <- renderPlotly({
+    req(input$date_pie)
+    
+    time_log <- time_log_reactive()
+    selected_date <- as.POSIXct(input$date_pie, format = "%Y-%m-%d")
+    
+    if (is.POSIXct(selected_date)) {
+      selected_data <- time_log[as.Date(time_log$Date) == as.Date(selected_date), ]
+      
+      if (nrow(selected_data) > 0) {
+        pie_data <- table(selected_data$Activity)
+        
+        pie_chart <- plot_ly(
+          labels = names(pie_data),
+          values = pie_data,
+          type = "pie",
+          marker = list(colors = rainbow(length(pie_data)))
+        )
+        
+        pie_chart <- pie_chart %>%
+          layout(title = paste("Activities on", input$date_pie),
+                 xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+                 yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+        
+        return(pie_chart)
+      }
+    }
+    
+    return(NULL)
+  })
+}
+
+# Run the Shiny app
+shinyApp(ui, server)
+
+```
