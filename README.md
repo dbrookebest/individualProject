@@ -11,7 +11,6 @@ The Spotify Data Shiny app is an interactive data visualization tool that allows
 - R (Version 2023.06.02+561 or higher)
 - Shiny (Version X.X.X)
 - Plotly (Version X.X.X)
-- Other dependencies, if any
 
 ## Installation
 
